@@ -69,6 +69,26 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
         df (Pandas dataframe): data of benchmark
         df_quart (Pandas dataframe): quartiles of benchmark data
 
+    Example for cfg_noise:
+    ---------------------
+        cfg_noise = dict({
+            # seed of numpy rng
+            'seed':             13395,
+            # take a large number
+            'niter':            30,
+            # 'normal', 'uniform' or 'triangular',
+            # according to http://www.isgmax.com/Articles_Papers/Selecting%20and%20Applying%20Error%20Distributions.pdf
+            'distribution':     'normal',
+            # 3*sigma at 1 mSv from https://doi.org/10.1016/j.radmeas.2024.107346,
+            # Table 4, worst case
+            'scale':            3*0.034,
+            # renormalize total dose+noise to 1 mSv
+            'normalize':        True,
+            # export panda data frames
+            'save_to_csv':      False,
+            'plot_results':     True
+        })
+
     -------------------------------------------------------------------------
     @Author:    Andreas Pitzschke (andreas.pitzschke@chuv.ch),
                 University hospital Lausanne, Switzerland, 2025
@@ -83,8 +103,7 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
             'niter':            30,         # take a large number, this one is only for testing
             'distribution':     'normal',
             # according to http://www.isgmax.com/Articles_Papers/Selecting%20and%20Applying%20Error%20Distributions.pdf
-            'scale':            0.15,       # 3*sigma from https://doi.org/10.1016/j.radmeas.2024.107346
-            'normalize':        True,       # renormalize total dose+noise to 1 mSv
+            'scale':            0.10,       # 3*sigma from https://doi.org/10.1016/j.radmeas.2024.107346
             'save_to_csv':      False,      # export panda data frames
             'plot_results':     True
         })
@@ -144,12 +163,12 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
     np.random.seed(cfg_noise.get('seed'))
 
     # init. some constants
-    if cfg_alg.icru_version == 57:
+    if cfg_alg.icru_version == 51:
         E_Cs = 0.662
-    elif cfg_alg.icru_version == 93:
+    elif cfg_alg.icru_version == 95:
         E_Cs = 0.639
     else:
-        raise ValueError('ICRU version must be 57 or 93')
+        raise ValueError('ICRU version must be 51 or 95')
 
     # 1) iterate over photon energies
     i_iter = 0
@@ -282,9 +301,9 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
     # whisker plot of R(Eeff)
     if cfg_noise.get('plot_results'):
 
-        if cfg_alg.icru_version == 57:
+        if cfg_alg.icru_version == 51:
             E_Cs = 0.662
-        elif cfg_alg.icru_version == 93:
+        elif cfg_alg.icru_version == 95:
             E_Cs = 0.639
 
         # figure for photon energies
@@ -367,8 +386,7 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
                 x, [1.3, 1.3],
                 marker='', linestyle='--', color='C01'
             )
-            x_Cs = dm_characteristics.response_photons.get(
-                'energy').index(E_Cs)
+            x_Cs = dm_characteristics.response_photons.get('energy').index(E_Cs)
             ax[ll[0], ll[1]].plot(
                 [x_Cs - 0.5, x_Cs + 0.5], [0.9, 0.9],
                 marker='', linestyle='--', color='C01'
@@ -406,15 +424,21 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
     # print('{:30}\t:\t{:3.2e}'.format('ChiSq(Hp10(137Cs))', chisq_Hp10_Cs))
     print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp10(all)))', np.sqrt(chisq_Hp10)))
     print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp10(137Cs)))', np.sqrt(chisq_Hp10_Cs)))
+    # print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp10(all)))', df['R(Hp10)'].std()))
+    # print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp10(137Cs)))', df['R(Hp10)'].loc[df['energy_ref'] == E_Cs].std()))
     print(80 * '-')
     # print('{:30}\t:\t{:3.2e}'.format('ChiSq(Hp007(all))', chisq_Hp007))
     # print('{:30}\t:\t{:3.2e}'.format('ChiSq(Hp007(137Cs))', chisq_Hp007_Cs))
     print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp007(all)))', np.sqrt(chisq_Hp007)))
     print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp007(137Cs)))', np.sqrt(chisq_Hp007_Cs)))
+    # print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp007(all)))', df['R(Hp007)'].std()))
+    # print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp007(137Cs)))', df['R(Hp007)'].loc[df['energy_ref'] == E_Cs].std()))
     print(80 * '-')
     # print('{:30}\t:\t{:3.2e}'.format('ChiSq(E)', chisq_E))
     print('{:30}\t:\t{:3.2e}'.format('SD(R(E))', np.sqrt(chisq_E)))
     print('{:30}\t:\t{:3.2e}'.format('SD(R(E(137Cs)))', np.sqrt(chisq_E_Cs)))
+    # print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp007(all)))', df['R(Hp007)'].std()))
+    # print('{:30}\t:\t{:3.2e}'.format('SD(R(Hp007(137Cs)))', df['R(Hp007)'].loc[df['energy_ref'] == E_Cs].std()))
 
     # compute quartiles and more
     df_quart = df[['energy_ref', 'R(E)', 'R(Hp10)', 'R(Hp007)']]
@@ -462,15 +486,28 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
         Hp007_in=('R(Hp007)', lambda x: ((x >= 0.71) & (x <= 1.67)).sum())
     )
 
-    # Swiss ordinance on dosimetry (2018) requirements : 0.7 <= R <= 1.3
+    # Swiss ordinance on dosimetry (2018) requirements:
+    # photons: 0.7 <= R <= 1.3
+    # betas, high E: 0.5 <= R <= 2.0
+    if dose['betas']['Hp(0.07)'][0] > 0:
+        if (dose['photons'].get('Hp(0.07)', 0.0) > 0 or dose['photons'].get('Hp(10)', 0.0) > 0):
+            # mixed field
+            ul = np.sqrt(1.3**2 + 2.0**2)
+            ll = 1 - np.sqrt((1 - 0.7)**2 + (1 - 0.5)**2)
+        else:
+            # betas only
+            ul, ll = 2.0, 0.5
+    else:
+        # photons only
+        ul, ll = 1.3, 0.7
     df_ch = df[['energy_ref', 'R(E)', 'R(Hp10)', 'R(Hp007)']]
     df_ch = df_ch.groupby(by='energy_ref').agg(
         E_cnt=('R(E)', 'count'),
-        E_in=('R(E)', lambda x: ((x >= 0.7) & (x <= 1.3)).sum()),
+        E_in=('R(E)', lambda x: ((x >= ll) & (x <= ul)).sum()),
         Hp10_cnt=('R(Hp10)', 'count'),
-        Hp10_in=('R(Hp10)', lambda x: ((x >= 0.7) & (x <= 1.3)).sum()),
+        Hp10_in=('R(Hp10)', lambda x: ((x >= ll) & (x <= ul)).sum()),
         Hp007_cnt=('R(Hp007)', 'count'),
-        Hp007_in=('R(Hp007)', lambda x: ((x >= 0.7) & (x <= 1.3)).sum())
+        Hp007_in=('R(Hp007)', lambda x: ((x >= ll) & (x <= ul)).sum())
     )
 
     # concatenate
@@ -489,15 +526,15 @@ def benchmark_algorithm_robustness(dose_in=None, cfg_alg=None, cfg_noise: dict =
 
         # all data
         fnm_all = 'ICRU-{}_method_{}_all.csv'.format(cfg_alg.icru_version, cfg_alg.calc_method['energy'])
-        df.round(3).to_csv(os.path.join(cwd, fnm_all))
+        df.round(3).to_csv(os.path.join(cwd, fnm_all), sep=';')
 
         # quantiles
         fnm_quart = 'ICRU-{}_method_{}_quartiles.csv'.format(cfg_alg.icru_version, cfg_alg.calc_method['energy'])
-        df_quart.round(3).to_csv(os.path.join(cwd, fnm_quart))
+        df_quart.round(3).to_csv(os.path.join(cwd, fnm_quart), sep=';')
 
         # regulatory requirements
         fnm_req = 'ICRU-{}_method_{}_regulatory.csv'.format(cfg_alg.icru_version, cfg_alg.calc_method['energy'])
-        df_req.round(3).to_csv(os.path.join(cwd, fnm_req))
+        df_req.round(3).to_csv(os.path.join(cwd, fnm_req), sep=';')
 
     return df, df_quart, df_req
 
@@ -723,12 +760,12 @@ def system_calibration_normalization(lookup: object = None, quantity: str = None
             raise ValueError("Measuring quantity mut be: 'kerma', 'Hp007' or 'Hp10'")
 
     # define energy of 137Cs
-    if lookup.config.icru_version == 57:
+    if lookup.config.icru_version == 51:
         E_Cs = 0.662
-    elif lookup.config.icru_version == 93:
+    elif lookup.config.icru_version == 95:
         E_Cs = 0.639
     else:
-        raise ValueError('ICRU version must be 57 or 93.')
+        raise ValueError('ICRU version must be 51 or 95.')
 
     # if E is None:
     #     print('No effective photon energy provided. Fallback to 137Cs energy.')
@@ -1215,12 +1252,12 @@ def SD_from_CI(val: float, val_UB: float, val_LB: float, dist: str = 'half-cosin
 ##############################################################################
 
 
-def get_hpK(icru_version: int = 57) -> dict:
+def get_hpK(icru_version: int = 51) -> dict:
     """
     Provide hpK coefficients for photon effective energy depending on ICRU version.
 
     The default air kerma to dose equivalent conversion coefficients are
-    based on ISO 4037-3:2019 (ICRU 57 and publications of Ankerhold in
+    based on ISO 4037-3:2019 (ICRU 51 and publications of Ankerhold in
     2000 and 2007)
     The ICRU 95 coefficients are from the publication of Behrens et al. from
     2022, Journal of Radiological Protection:
@@ -1228,11 +1265,11 @@ def get_hpK(icru_version: int = 57) -> dict:
 
     Syntax:
     ------
-        get_hpK(icru_version = 57)
+        get_hpK(icru_version = 51)
 
     Arg.:
     ----
-        icru_version (int): publication 57 or 93
+        icru_version (int): publication 51 or 95
 
     Output:
     ------
@@ -1248,7 +1285,7 @@ def get_hpK(icru_version: int = 57) -> dict:
             '137Cs', '60Co', 'R-C', 'R-F')
 
     # select air kerma to dose equivalent coefficients
-    if icru_version == 57:
+    if icru_version == 51:
         energy = (0.012, 0.017, 0.020, 0.026,
                   0.033, 0.048, 0.065, 0.083, 0.100,
                   0.118, 0.161, 0.207, 0.248, 0.288,
@@ -1274,7 +1311,7 @@ def get_hpK(icru_version: int = 57) -> dict:
                 1.660, 1.530, 1.460, 1.410, 1.370,
                 1.330, 1.220, 1.160, 1.120, 1.120)
 
-    elif icru_version == 93:
+    elif icru_version == 95:
         # Behrens & Otto, J. Radiol. Prot. 42 (2022)
         energy = (0.0124, 0.0163, 0.0203, 0.0246, 0.0333,
                   0.0479, 0.0652, 0.0833, 0.1004, 0.1182,
@@ -1365,8 +1402,8 @@ class DoseCalcConfig():
             return
 
         # version of hpK conversion factors
-        # ICRU 57 (current standard of ISO 4037-3) or 93
-        self.icru_version = 57
+        # ICRU 51 (current standard of ISO 4037-3) or 95
+        self.icru_version = 51
 
         # energy-axis for interpolation of response and hpK
         self.energy_axis = dict({
@@ -1413,10 +1450,10 @@ class DoseCalcConfig():
             # (recommended) if required, add channel specific to beta/low energy photons
             'add_beta_channel':         True,
             # solving a linear system of equations for improving Eeff
-            'energy_postprocessing':    True,
+            'energy':                   True,
             # solving a SOLE for improving the dose values (True/False or threshold Eeff ~ 0.15 MeV)
             # note: at Hp(10)=1 mSv and Hp(0.07, 90Sr)=1 mSv, select Eeff threshold or Hp(0.07, 137Cs) is off by ~15%
-            'dose_postprocessing':      0.15,
+            'dose':                     0.15,
             # (NOT recommended) final results polishing with help of least-square-fitting -> bad convergence
             'lsq':                      False,
         })
@@ -1522,7 +1559,7 @@ class DosimeterCharacteristics(DoseCalcConfig):
 
     def __dosimeter_response__(self):
         """
-        Provide filter response of dosimeter (for ICRU 57 and 93).
+        Provide filter response of dosimeter (for ICRU 51 and 95).
 
         Syntax:
         ------
@@ -1532,12 +1569,12 @@ class DosimeterCharacteristics(DoseCalcConfig):
                     University hospital Lausanne, Switzerland, 2025
         """
         # check available dosimeter versions
-        supported_icru_versions = (57, 93)
+        supported_icru_versions = (51, 95)
         version = self.config.icru_version
         if version not in supported_icru_versions:
             raise ValueError('Unsupported ICRU version!')
 
-        if version == 57:
+        if version == 51:
 
             # element response in terms of air kerma
             self.response_photons = {
@@ -1634,7 +1671,7 @@ class DosimeterCharacteristics(DoseCalcConfig):
                 }
             }
 
-        elif version == 93:
+        elif version == 95:
             # new definitions according to publication:
             # https://doi.org/10.1088/1361-6498/abc860
             # photon energy in MeV
@@ -1942,7 +1979,7 @@ class LookupTable(DosimeterCharacteristics):
         Interpolation is set to 'linear' as hpK=F(log10(E)) for a pre-defined
         energy axis provided by the class itself.
         The default air kerma to dose equivalent conversion coefficients,
-        Hp(d)/Ka at 0°, are based on ISO 4037-3:2019 (ICRU 57 and publications
+        Hp(d)/Ka at 0°, are based on ISO 4037-3:2019 (ICRU 51 and publications
         of Ankerhold in 2000 and 2007).
 
         Syntax:
@@ -3073,12 +3110,12 @@ class DoseCalculator(LookupTable):
 
             # >>>>> if required, do postprocessing of photon energy <<<<<
             if (
-                    self.config.optimization.get('energy_postprocessing')
+                    self.config.optimization.get('energy')
                     and E_ph is not None
                     ):
                 if self.config.verbose > 1:
                     print('post-processing of effective photon energy:')
-                E_ph, E_ph_LB, E_ph_UB = self.__energy_postprocessing__(E_ph, E_ph_LB, E_ph_UB)
+                E_ph, E_ph_LB, E_ph_UB = self.__energy_optimization__(E_ph, E_ph_LB, E_ph_UB)
 
         if E_ph is None:
             # set photon effective energy to 137Cs (approx. for residual background at high photon energy)
@@ -3231,30 +3268,42 @@ class DoseCalculator(LookupTable):
             # first iteration
             RR = self.ratio_measured
 
-        # loop over usable filter ratios
-        E, E_sd, E_LB, E_UB = list(), list(), list(), list()
-        for key in self.energies_photons.keys():
+        def select_ratio_energies(RR_min: float, RR_max: float) -> list():
+            """Collect valid energy values from filter ratio."""
+            E, E_sd, E_LB, E_UB = list(), list(), list(), list()
+            for key in self.energies_photons.keys():
 
-            # check for valid energy from ratio
-            if self.energies_photons.get(key)['validity']:
+                # check ratio validity
+                if self.energies_photons[key]['validity']:
 
-                # check on value of ratio
-                if (
-                        RR.get(key)['validity']
-                        and RR.get(key)['validity']
-                        # tweaking parameter 1
-                        # don't set <1.0 or the low energy ratio H1/H4 will dominate due to a too important weight
-                        and RR.get(key)['value'] <= 0.95
-                        # tweaking parameter 2
-                        and RR.get(key)['value'] >= 0.05
-                ):
-                    # if check is passed, at value to list
-                    E.append(self.energies_photons.get(key).get('value'))
-                    E_sd.append(self.energies_photons.get(key).get('SD'))
-                    E_LB.append(self.energies_photons.get(key).get('ci997')[0])
-                    E_UB.append(self.energies_photons.get(key).get('ci997')[1])
+                    # check value of ratio
+                    if (
+                            RR[key]['validity']
+                            and RR[key]['value'] < RR_max
+                            and RR[key]['value'] > RR_min
+                    ):
+                        # if check is passed, at value to list
+                        E.append(self.energies_photons.get(key).get('value'))
+                        E_sd.append(self.energies_photons.get(key).get('SD'))
+                        E_LB.append(self.energies_photons.get(key).get('ci997')[0])
+                        E_UB.append(self.energies_photons.get(key).get('ci997')[1])
 
-        # if no data, return to defaults
+            return list([E, E_sd, E_LB, E_UB])
+
+        # 1st run: seek ratio energies
+        (E, E_sd, E_LB, E_UB) = select_ratio_energies(0.1, 0.9)
+
+        # 2nd run: if no data returned, increase tolerances
+        # Note: for low (< 20 keV) or high (approx. 200 keV) photon energy
+        if len(E) == 0:
+            (E, E_sd, E_LB, E_UB) = select_ratio_energies(0.05, 0.95)
+
+        # 3rd run: if still no data returned, increase tolerances even more
+        # Note: for high photon energy (approx. 250 keV)
+        if len(E) == 0:
+            (E, E_sd, E_LB, E_UB) = select_ratio_energies(0.05, 1.05)
+
+        # if no result, return to defaults
         if len(E) == 0:
             if self.config.verbose > 0:
                 print(
@@ -3401,7 +3450,7 @@ class DoseCalculator(LookupTable):
 
     ##############################################################################
 
-    def __energy_postprocessing__(self, E_ph: float, E_ph_LB: float, E_ph_UB: float) -> tuple[float, float, float]:
+    def __energy_optimization__(self, E_ph: float, E_ph_LB: float, E_ph_UB: float) -> tuple[float, float, float]:
         """
         Post-processing the effective photon energy.
 
@@ -3413,7 +3462,7 @@ class DoseCalculator(LookupTable):
 
         Syntax:
         ------
-           E_ph, E_ph_LB, E_ph_UB = __energy_postprocessing__(E_ph, E_ph_LB, E_ph_UB)
+           E_ph, E_ph_LB, E_ph_UB = __energy_optimization__(E_ph, E_ph_LB, E_ph_UB)
 
 
         @Author:    Andreas Pitzschke (andreas.pitzschke@chuv.ch),
@@ -3433,7 +3482,7 @@ class DoseCalculator(LookupTable):
             })
 
         # further optimization of effective photon energy
-        if self.config.optimization.get('energy_postprocessing'):
+        if self.config.optimization.get('energy'):
             if E_ph <= threshold.get('E_ph_verylow'):
 
                 # for very low energies: channel 4 is required
@@ -3808,22 +3857,22 @@ class DoseCalculator(LookupTable):
 
         # >>>>> if required, do postprocessing of dose <<<<<
         if (
-                self.config.optimization.get('dose_postprocessing')
+                self.config.optimization.get('dose')
                 and len(self.Kerma) > 0
                 ):
 
             # dose post-processing of dose values
             flg = False
-            if isinstance(self.config.optimization.get('dose_postprocessing'), bool):
+            if isinstance(self.config.optimization.get('dose'), bool):
                 flg = True
-            if isinstance(self.config.optimization.get('dose_postprocessing'), float):
-                if self.config.optimization.get('dose_postprocessing') <= self.effective_photon_energy.get('value'):
+            if isinstance(self.config.optimization.get('dose'), float):
+                if self.config.optimization.get('dose') <= self.effective_photon_energy.get('value'):
                     # if smaller than the provided effective photon energy
                     flg = True
             if flg is True:
                 if self.config.verbose > 1:
                     print('post-processing of dose:')
-                self.__dose_postprocessing__()
+                self.__dose_optimization__()
 
         # correct for background dose H*(d)
         self.background_correction()
@@ -4248,13 +4297,13 @@ class DoseCalculator(LookupTable):
 
     ##############################################################################
 
-    def __dose_postprocessing__(self):
+    def __dose_optimization__(self):
         """
         Post-processing dose values by solving a SOLE for air kerma beta contribution to Hp(0.07).
 
         Syntax:
         ------
-           __dose_postprocessing__(self)
+           __dose_optimization__(self)
 
         Details:
         -------
@@ -4534,7 +4583,7 @@ class DoseLSQOptimizer(DoseCalculator):
     """
     Class for the LSQ-optimization.
 
-    Note: Method depreciated for weak outcome with respect to dose_postprocessing approach and low speed
+    Note: Method depreciated for weak outcome with respect to dose_optimization approach and low speed
 
     @Author:    Andreas Pitzschke (andreas.pitzschke@chuv.ch),
                 University hospital Lausanne, Switzerland, 2025
